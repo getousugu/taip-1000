@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Type Saga - Exam Master</title>
+    <meta name="description" content="AI生成の課題による本格タイピング検定ソフト。">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Noto+Sans+JP:wght@400;700&family=Outfit:wght@300;600&display=swap" rel="stylesheet">
+  <script type="module" crossorigin src="/taip-1000/assets/index-DS5PQBVs.js"></script>
+  <link rel="stylesheet" crossorigin href="/taip-1000/assets/index-BYUr6xes.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Main Menu / Exam Setup -->
+        <div id="menu" class="screen active">
+            <header class="hero">
+                <h1 class="glitch" data-text="TYPE SAGA">TYPE SAGA</h1>
+            </header>
+            
+            <div class="setup-panel glass">
+                <div class="input-group">
+                    <label for="api-key">Groq API Key</label>
+                    <input type="password" id="api-key" placeholder="gsk_...">
+                </div>
+                
+                <div class="settings-grid">
+                    <div class="input-group">
+                        <label for="char-count">目標文字数</label>
+                        <input type="number" id="char-count" value="1000" min="100" max="2000">
+                    </div>
+                    <div class="input-group">
+                        <label for="target-model">使用モデル</label>
+                        <select id="target-model">
+                            <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile (推奨)</option>
+                            <!-- 他のモデルはAPIキー入力後に自動取得 -->
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="difficulty">難易度</label>
+                        <select id="difficulty">
+                            <option value="beginner">初級 (常用漢字中心)</option>
+                            <option value="intermediate" selected>中級 (熟語・専門語)</option>
+                            <option value="advanced">上級 (難読漢字・記号)</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="genre">ジャンル (自由入力)</label>
+                        <input type="text" id="genre" placeholder="例: IT, ニュース, SF小説" value="ランダム">
+                    </div>
+                    <div class="input-group">
+                        <label for="time-limit">制限時間 (秒)</label>
+                        <input type="number" id="time-limit" value="600" min="10">
+                    </div>
+                </div>
+                
+                <button id="start-btn" class="primary-btn">試験開始 (課題文生成)</button>
+
+                <div class="how-to">
+                    <h3>使い方</h3>
+                    <ol>
+                        <li><a href="https://console.groq.com/keys" target="_blank" rel="noopener">Groq Console</a> で無料のAPIキーを取得し、入力欄に貼り付ける</li>
+                        <li>文字数・難易度・ジャンル・制限時間を設定して <strong>試験開始</strong> を押す</li>
+                        <li>AIが課題文を生成したら、上の欄を見ながら下の入力エリアに書き写す</li>
+                        <li>時間切れ、または <strong>試験終了</strong> ボタンで採点画面へ</li>
+                        <li>採点結果と差分ハイライトで、誤字・脱字を確認できる</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Screen -->
+        <div id="loading" class="screen">
+            <div class="loader-container">
+                <div class="spinner"></div>
+                <p id="loading-msg">検定課題をAIが作成中...</p>
+            </div>
+        </div>
+
+        <!-- Exam Screen -->
+        <div id="game" class="screen exam-mode">
+            <div class="exam-header glass">
+                <div class="timer-display">
+                    <span class="label">REMAINING TIME</span>
+                    <span id="timer" class="value">10:00</span>
+                </div>
+                <div class="exam-stats">
+                    <div class="stat-item">
+                        <span class="label">TARGET COUNT</span>
+                        <span id="target-count" class="value">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="label">CURRENT COUNT</span>
+                        <span id="current-count" class="value">0</span>
+                    </div>
+                </div>
+                <button id="finish-btn" class="secondary-btn">試験終了 (採点へ)</button>
+            </div>
+
+            <div class="exam-container">
+                <div class="target-pane glass">
+                    <h3>【課題文】</h3>
+                    <div id="target-text" class="text-content">
+                        <!-- Target text will be here -->
+                    </div>
+                </div>
+                <div class="input-pane glass">
+                    <h3>【入力エリア】</h3>
+                    <textarea id="exam-input" placeholder="ここに入力してください..." spellcheck="false"></textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- Result Screen -->
+        <div id="result" class="screen">
+            <div class="result-card glass">
+                <h2>検定結果報告書</h2>
+                <div class="result-summary">
+                    <div class="rank-box">
+                        <span class="label">判定</span>
+                        <span id="final-rank" class="value">-</span>
+                    </div>
+                    <div class="stats-box">
+                        <div class="res-item">
+                            <span class="label">正解文字数</span>
+                            <span id="res-correct" class="value">0</span>
+                        </div>
+                        <div class="res-item danger">
+                            <span class="label">誤字</span>
+                            <span id="res-mistakes" class="value">0</span>
+                        </div>
+                        <div class="res-item danger">
+                            <span class="label">脱字</span>
+                            <span id="res-omissions" class="value">0</span>
+                        </div>
+                        <div class="res-item warning">
+                            <span class="label">余過</span>
+                            <span id="res-additions" class="value">0</span>
+                        </div>
+                    </div>
+                    <div class="speed-metrics">
+                        <div class="res-item">
+                            <span class="label">純速度 (KPM)</span>
+                            <span id="final-wpm" class="value">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 差分詳細 -->
+                <div class="diff-section">
+                    <h3 class="diff-title">差分詳細</h3>
+                    <div class="diff-legend">
+                        <span class="legend-item"><span class="diff-match">■</span> 正解</span>
+                        <span class="legend-item"><span class="diff-omission">■</span> 脱字（抜けた字）</span>
+                        <span class="legend-item"><span class="diff-addition">■</span> 余過（余計な字）</span>
+                    </div>
+                    <div id="diff-display" class="diff-content"></div>
+                </div>
+
+                <button id="retry-btn" class="primary-btn">トップに戻る</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
