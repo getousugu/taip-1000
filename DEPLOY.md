@@ -1,4 +1,4 @@
-# Type Saga — GitHub Pages デプロイ手順
+# Typing Nexus — GitHub Pages デプロイ手順
 
 ## 概要
 
