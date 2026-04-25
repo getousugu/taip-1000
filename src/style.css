@@ -449,6 +449,13 @@ textarea#exam-input {
 }
 
 .diff-match    { color: #c8c8c8; }
+.diff-substitution {
+    background: rgba(153, 51, 255, 0.25);
+    color: #cc66ff;
+    border-bottom: 2px solid #cc66ff;
+    border-radius: 2px;
+    padding: 1px 0;
+}
 .diff-omission {
     background: rgba(255, 51, 102, 0.25);
     color: var(--error-color);

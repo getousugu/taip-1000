@@ -7,57 +7,101 @@
 const MAX_SAFE_CELLS = 4_000_000; // ~16MB (Int32Array) — 2000×2000 まで
 
 export function calculateDiff(target, input) {
-    const n = target.length;
     const m = input.length;
+    // タイピングの性質上、入力文字数から極端に離れた後方の文章と散発的にマッチして
+    // 差分表示が崩れる（LCSの弱点）のを防ぐため、検索範囲を先頭から一定文字数に制限する
+    const searchLimit = Math.min(target.length, m + 100);
+    const targetWindow = target.slice(0, searchLimit);
+    const n = targetWindow.length;
 
     if (n * m > MAX_SAFE_CELLS) {
         return simpleDiff(target, input);
     }
 
     // DP Table for LCS (Longest Common Subsequence)
+    // 後方から計算することで、前方のマッチを優先（タイピングの入力順に合わせる）
     const dp = new Int32Array((n + 1) * (m + 1));
     const getIdx = (i, j) => i * (m + 1) + j;
 
-    for (let i = 1; i <= n; i++) {
-        for (let j = 1; j <= m; j++) {
-            if (target[i - 1] === input[j - 1]) {
-                dp[getIdx(i, j)] = dp[getIdx(i - 1, j - 1)] + 1;
+    for (let i = n - 1; i >= 0; i--) {
+        for (let j = m - 1; j >= 0; j--) {
+            if (targetWindow[i] === input[j]) {
+                dp[getIdx(i, j)] = dp[getIdx(i + 1, j + 1)] + 1;
             } else {
-                dp[getIdx(i, j)] = Math.max(dp[getIdx(i - 1, j)], dp[getIdx(i, j - 1)]);
+                dp[getIdx(i, j)] = Math.max(dp[getIdx(i + 1, j)], dp[getIdx(i, j + 1)]);
             }
         }
     }
 
-    // バックトラック: 差分アライメントを構築
+    // バックトラック: 前から順に差分アライメントを構築
     const alignment = [];
-    let i = n, j = m;
-    let additions = 0, omissions = 0;
+    let i = 0, j = 0;
 
-    while (i > 0 || j > 0) {
-        if (i > 0 && j > 0 && target[i - 1] === input[j - 1]) {
-            alignment.unshift({ type: 'match', char: target[i - 1] });
-            i--; j--;
-        } else if (j > 0 && (i === 0 || dp[getIdx(i, j - 1)] >= dp[getIdx(i - 1, j)])) {
-            alignment.unshift({ type: 'addition', char: input[j - 1] });
-            additions++;
-            j--;
+    while (i < n || j < m) {
+        if (i < n && j < m && targetWindow[i] === input[j]) {
+            alignment.push({ type: 'match', char: targetWindow[i] });
+            i++; j++;
+        } else if (j < m && (i === n || dp[getIdx(i, j + 1)] >= dp[getIdx(i + 1, j)])) {
+            alignment.push({ type: 'addition', char: input[j] });
+            j++;
         } else {
-            alignment.unshift({ type: 'omission', char: target[i - 1] });
-            omissions++;
-            i--;
+            alignment.push({ type: 'omission', char: targetWindow[i] });
+            i++;
         }
     }
 
-    const actualMistakes = Math.min(additions, omissions);
-    const actualAdditions = additions - actualMistakes;
-    const actualOmissions = omissions - actualMistakes;
+    // 検索ウィンドウから漏れた残りの課題文はすべて「脱字」として末尾に追加
+    for (let k = searchLimit; k < target.length; k++) {
+        alignment.push({ type: 'omission', char: target[k] });
+    }
+
+    // バックトラックで得た生のアライメントを後処理し、
+    // 隣接する脱字(omission)と余過(addition)を「誤字(substitution)」に結合する
+    const condensed = [];
+    let i_align = 0;
+    while (i_align < alignment.length) {
+        if (alignment[i_align].type === 'match') {
+            condensed.push(alignment[i_align]);
+            i_align++;
+        } else {
+            let expChars = '';
+            let actChars = '';
+            while (i_align < alignment.length && alignment[i_align].type !== 'match') {
+                if (alignment[i_align].type === 'omission') expChars += alignment[i_align].char;
+                if (alignment[i_align].type === 'addition') actChars += alignment[i_align].char;
+                i_align++;
+            }
+            
+            const minLen = Math.min(expChars.length, actChars.length);
+            // 共通の長さ分は「誤字(substitution)」として扱う
+            for (let k = 0; k < minLen; k++) {
+                condensed.push({ type: 'substitution', expected: expChars[k], char: actChars[k] });
+            }
+            // 余った脱字
+            for (let k = minLen; k < expChars.length; k++) {
+                condensed.push({ type: 'omission', char: expChars[k] });
+            }
+            // 余った余過
+            for (let k = minLen; k < actChars.length; k++) {
+                condensed.push({ type: 'addition', char: actChars[k] });
+            }
+        }
+    }
+
+    // カウントの再集計（レンダリングと完全に一致させる）
+    let actualMistakes = 0, actualOmissions = 0, actualAdditions = 0;
+    for (const item of condensed) {
+        if (item.type === 'substitution') actualMistakes++;
+        else if (item.type === 'omission') actualOmissions++;
+        else if (item.type === 'addition') actualAdditions++;
+    }
 
     return {
         mistakes: actualMistakes,
         omissions: actualOmissions,
         additions: actualAdditions,
-        correct: dp[getIdx(n, m)],
-        alignment,
+        correct: dp[getIdx(0, 0)],
+        alignment: condensed,
     };
 }
 

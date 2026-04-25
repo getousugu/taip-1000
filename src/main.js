@@ -224,10 +224,11 @@ class ExamApp {
         const html = alignment.map(a => {
             const escaped = escapeHtml(a.char);
             switch (a.type) {
-                case 'match':    return `<span class="diff-match">${escaped}</span>`;
-                case 'omission': return `<span class="diff-omission" title="脱字">${escaped}</span>`;
-                case 'addition': return `<span class="diff-addition" title="余過">${escaped}</span>`;
-                default:         return escaped;
+                case 'match':        return `<span class="diff-match">${escaped}</span>`;
+                case 'substitution': return `<span class="diff-substitution" title="本来は「${a.expected}」">${escaped}</span>`;
+                case 'omission':     return `<span class="diff-omission" title="脱字">${escaped}</span>`;
+                case 'addition':     return `<span class="diff-addition" title="余過">${escaped}</span>`;
+                default:             return escaped;
             }
         }).join('');
 
