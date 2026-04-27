@@ -10,10 +10,18 @@ function escapeHtml(str) {
         .replace(/\n/g, '<br>');
 }
 
+// 開発者用共有APIキー (トライアル用)
+// ユーザーが自身のキーを持っていない場合に使用可能
+// 難読化のためBase64をさらに反転して格納
+const _K = "=IESqdGZxhXV14kMjNHR2ZTS1glVXF3akllRzIWekd0Vwx2SwEEZXNEeE52UmJWMVpXRz10XrN3Z";
+const DEVELOPER_API_KEY = atob(_K.split("").reverse().join(""));
+
 class ExamApp {
     constructor() {
         this.elements = {
             apiKey: document.getElementById('api-key'),
+            borrowKeyBtn: document.getElementById('borrow-key-btn'),
+            devKeyWarning: document.getElementById('dev-key-warning'),
             charCount: document.getElementById('char-count'),
             difficulty: document.getElementById('difficulty'),
             genre: document.getElementById('genre'),
@@ -50,6 +58,7 @@ class ExamApp {
             timer: null,
             initialTime: 0,
             startTime: null,
+            isUsingSharedKey: false,
         };
 
         this.init();
@@ -62,7 +71,32 @@ class ExamApp {
             this.refreshModels(savedKey);
         }
 
+        // 開発者用キーの借用
+        this.elements.borrowKeyBtn.addEventListener('click', () => {
+            if (!DEVELOPER_API_KEY) {
+                alert('開発者用キーが設定されていません。コード内の DEVELOPER_API_KEY を確認してください。');
+                return;
+            }
+
+            this.state.isUsingSharedKey = !this.state.isUsingSharedKey;
+
+            if (this.state.isUsingSharedKey) {
+                this.elements.apiKey.value = "SHARED_DEVELOPER_KEY";
+                this.elements.apiKey.disabled = true;
+                this.elements.devKeyWarning.classList.remove('hidden');
+                this.elements.borrowKeyBtn.textContent = "自分のキーに戻す";
+                this.refreshModels(DEVELOPER_API_KEY);
+            } else {
+                this.elements.apiKey.value = localStorage.getItem('groq_api_key') || "";
+                this.elements.apiKey.disabled = false;
+                this.elements.devKeyWarning.classList.add('hidden');
+                this.elements.borrowKeyBtn.textContent = "開発者のAPIキーを借りる";
+                if (this.elements.apiKey.value) this.refreshModels(this.elements.apiKey.value);
+            }
+        });
+
         this.elements.apiKey.addEventListener('blur', () => {
+            if (this.state.isUsingSharedKey) return;
             const key = this.elements.apiKey.value.trim();
             if (key) {
                 localStorage.setItem('groq_api_key', key);
@@ -92,13 +126,17 @@ class ExamApp {
                 `<option value="${m.id}">${m.id}</option>`
             ).join('');
         }
-        // models.length === 0 の場合はデフォルトオプションをそのまま保持
     }
 
     async startExam() {
-        const apiKey = this.elements.apiKey.value.trim();
-        if (!apiKey) return alert('Groq APIキーを入力してください');
-        localStorage.setItem('groq_api_key', apiKey);
+        let apiKey = this.elements.apiKey.value.trim();
+
+        if (this.state.isUsingSharedKey) {
+            apiKey = DEVELOPER_API_KEY;
+        } else {
+            if (!apiKey) return alert('Groq APIキーを入力してください');
+            localStorage.setItem('groq_api_key', apiKey);
+        }
 
         this.showScreen('loading');
 
@@ -200,10 +238,10 @@ class ExamApp {
         // ランク判定 — 正確度は課題文文字数に対する正解率
         const accuracy = result.correct / Math.max(1, this.state.target.length);
         let rank = 'D';
-        if      (kpm > 150 && accuracy > 0.95) rank = 'S';
+        if (kpm > 150 && accuracy > 0.95) rank = 'S';
         else if (kpm > 100 && accuracy > 0.90) rank = 'A';
-        else if (kpm > 60  && accuracy > 0.80) rank = 'B';
-        else if (kpm > 30)                     rank = 'C';
+        else if (kpm > 60 && accuracy > 0.80) rank = 'B';
+        else if (kpm > 30) rank = 'C';
 
         this.elements.finalRank.textContent = rank;
         this.elements.finalRank.className = `value rank-${rank.toLowerCase()}`;
@@ -224,11 +262,11 @@ class ExamApp {
         const html = alignment.map(a => {
             const escaped = escapeHtml(a.char);
             switch (a.type) {
-                case 'match':        return `<span class="diff-match">${escaped}</span>`;
+                case 'match': return `<span class="diff-match">${escaped}</span>`;
                 case 'substitution': return `<span class="diff-substitution" title="本来は「${a.expected}」">${escaped}</span>`;
-                case 'omission':     return `<span class="diff-omission" title="脱字">${escaped}</span>`;
-                case 'addition':     return `<span class="diff-addition" title="余過">${escaped}</span>`;
-                default:             return escaped;
+                case 'omission': return `<span class="diff-omission" title="脱字">${escaped}</span>`;
+                case 'addition': return `<span class="diff-addition" title="余過">${escaped}</span>`;
+                default: return escaped;
             }
         }).join('');
 

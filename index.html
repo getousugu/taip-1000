@@ -20,8 +20,15 @@
             
             <div class="setup-panel glass">
                 <div class="input-group">
-                    <label for="api-key">Groq API Key</label>
+                    <div class="label-row">
+                        <label for="api-key">Groq API Key</label>
+                        <button id="borrow-key-btn" class="text-link-btn">開発者のAPIキーを借りる</button>
+                    </div>
                     <input type="password" id="api-key" placeholder="gsk_...">
+                    <div id="dev-key-warning" class="dev-warning-box hidden">
+                        <p>⚠️ <strong>開発者のAPIキーを使用中</strong></p>
+                        <p>無料枠のため制限（Rate Limit）がかかりやすく、生成に失敗することがあります。その場合は数分待つか、ご自身のキーを使用してください。</p>
+                    </div>
                 </div>
                 
                 <div class="settings-grid">
